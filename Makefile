@@ -13,6 +13,9 @@ $(TARGET_1): $(SRCS_1)
 $(TARGET_2): $(SRCS_2)
 	$(CXX) $(CXXFLAGS) $(SRCS_2) -o $(TARGET_2)
 
-.PHONY: clean
+.PHONY: clean run
 clean:
 	rm -f $(TARGET_1) $(TARGET_2)
+
+run: server 
+	valgrind ./server 9090

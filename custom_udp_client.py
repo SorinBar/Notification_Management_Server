@@ -17,7 +17,7 @@ while (True):
     command = input()
 
     # Send the data
-    sock.sendto(command.encode(), address)
+    sock.sendto(b'1111111111111111111111111111111111111111111111111z3myString\0', address)
 
     if command == "exit":
         break

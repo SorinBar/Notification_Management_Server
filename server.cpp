@@ -8,28 +8,15 @@
 #include <vector>
 #include <netinet/tcp.h>
 
-#define BUF_SIZE 1600
+#define BUF_SIZE 2000
 #define TIMEOUT -1
 
 // Print message to STDERR and exit
-void eerror(std::string message) {
-    std::cerr << message << std::endl;
-    exit(EXIT_FAILURE);
-}
-
-in_port_t str_to_port(std::string port_str) {
-    int port;
-    try {
-        port = std::stoi(port_str);
-    } catch (const std::exception& e) {
-        eerror("<PORT> ~ [0, 65535]");
-    }
-    if (port < 0 || UINT16_MAX < port) {
-        eerror("<PORT> ~ [0, 65535]");
-    }
-
-    return (in_port_t)port;
-}
+void eerror(std::string message);
+// Convert string to in_port_t/uint16_t
+in_port_t str_to_port(std::string port_str);
+// Process UDP buffer and send notification
+void UDP_input(char* buf, ssize_t len, struct sockaddr_in &addr);
 
 int main(int argc, char *argv[]) {
     /* Setup */
@@ -42,11 +29,12 @@ int main(int argc, char *argv[]) {
     setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 
 
-    /* server_addr */
-    struct sockaddr_in server_addr = {};
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    server_addr.sin_port = htons(port);
+    /* General Purpose Address */
+    struct sockaddr_in addr = {};
+    socklen_t addr_len = sizeof(addr);
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(port);
 
 
     /* UDP Socket */
@@ -55,7 +43,7 @@ int main(int argc, char *argv[]) {
         eerror("UDP socket creation failed");
     }
     // Bind
-    if (bind(udp_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+    if (bind(udp_sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         eerror("UDP socket bind failed");
     }
 
@@ -71,7 +59,7 @@ int main(int argc, char *argv[]) {
         eerror("TCP socket nodelay failed");
     }
     // Bind
-	if (bind(tcp_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+	if (bind(tcp_sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         eerror("TCP socket bind failed");
     }
     // Listen
@@ -104,21 +92,17 @@ int main(int argc, char *argv[]) {
         }
         // Check for events on the UDP socket
         if (poll_fds[1].revents & POLLIN) {
-            ssize_t n = recvfrom(udp_sock, buf, BUF_SIZE, 0, nullptr, nullptr);
-            if (n < 0) {
+            ssize_t len = recvfrom(udp_sock, buf, BUF_SIZE, 0, (struct sockaddr *)&addr, &addr_len);
+            if (len < 0) {
                 std::cerr << "UDP receive failed";
                 continue;
             }
-            buf[n] = '\0';
-            std::cout << "Received data from UDP socket: " << buf << '\n';
-            if (strcmp(buf, "exit") == 0)
-                break;
+            UDP_input(buf, len, addr);
         }
         // Check for events on the TCP Listen socket
         if (poll_fds[2].revents & POLLIN) {
             // Accept incoming connection
-            int aux = sizeof(server_addr);
-            int new_socket = accept(tcp_sock, (struct sockaddr *)&server_addr, (socklen_t*)&aux);
+            int new_socket = accept(tcp_sock, (struct sockaddr *)&addr, &addr_len);
             
             // Handle new connection
             std::cout << "New client connected" << std::endl;
@@ -139,4 +123,39 @@ int main(int argc, char *argv[]) {
     close(tcp_sock);
 
     return 0;
+}
+
+void eerror(std::string message) {
+    std::cerr << message << std::endl;
+    exit(EXIT_FAILURE);
+}
+
+in_port_t str_to_port(std::string port_str) {
+    int port;
+    try {
+        port = std::stoi(port_str);
+    } catch (const std::exception& e) {
+        eerror("<PORT> ~ [0, 65535]");
+    }
+    if (port < 0 || UINT16_MAX < port) {
+        eerror("<PORT> ~ [0, 65535]");
+    }
+
+    return (in_port_t)port;
+}
+
+void UDP_input(char* buf, ssize_t len, struct sockaddr_in &addr) {
+    std::cout << inet_ntoa(addr.sin_addr) << std::endl;
+    std::cout << ntohs(addr.sin_port) << std::endl;
+
+    char c;
+    std::string topic;
+
+    c = *(buf + 50);
+    *(buf + 50) = '\0';
+    topic = buf;
+    *(buf + 50) = c;
+
+
+    std::cout << topic << std::endl;
 }

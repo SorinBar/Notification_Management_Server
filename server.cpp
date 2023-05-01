@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <iostream>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -16,7 +16,7 @@ int main() {
 
     // Create a UDP socket
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        perror("socket creation failed");
+        std::cerr << "socket creation failed";
         exit(EXIT_FAILURE);
     }
 
@@ -28,7 +28,7 @@ int main() {
 
     // Bind the socket to the server address
     if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
-        perror("bind failed");
+        std::cerr << "bind failed";
         exit(EXIT_FAILURE);
     }
 
@@ -39,7 +39,7 @@ int main() {
 
         // Check if there was an error receiving data
         if (n < 0) {
-            perror("recvfrom failed");
+            std::cerr << "recvfrom failed";
             exit(EXIT_FAILURE);
         }
 
@@ -50,7 +50,7 @@ int main() {
             break;
 
         // Print the received data to stdout
-        printf("Received data from client: %s\n", buffer);
+        std::cout << "Received data from client: " << buffer << std::endl; 
     }
 
 

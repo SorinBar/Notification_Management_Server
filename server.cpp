@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 
 
-    /* Server Address*/
+    /* server_addr */
     struct sockaddr_in server_addr = {};
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -71,7 +71,7 @@ int main(int argc, char *argv[]) {
         eerror("TCP socket nodelay failed");
     }
     // Bind
-	if (bind(tcp_sock, (struct sockaddr *) &server_addr, sizeof(struct sockaddr)) < 0) {
+	if (bind(tcp_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         eerror("TCP socket bind failed");
     }
     // Listen
@@ -82,11 +82,13 @@ int main(int argc, char *argv[]) {
 
 
     /* Poll */
-    std::vector<pollfd> poll_fds(2);
-    poll_fds[0].fd = udp_sock;
+    std::vector<pollfd> poll_fds(3);
+    poll_fds[0].fd = STDIN_FILENO;
     poll_fds[0].events = POLLIN;
-    poll_fds[1].fd = tcp_sock;
+    poll_fds[1].fd = udp_sock;
     poll_fds[1].events = POLLIN;
+    poll_fds[2].fd = tcp_sock;
+    poll_fds[2].events = POLLIN;
 
 
     /* Wait for events */
@@ -94,12 +96,17 @@ int main(int argc, char *argv[]) {
         if (poll(poll_fds.data(), poll_fds.size(), TIMEOUT) == -1) {
             eerror("Poll monitoring failed");
         }
-
-        // Check for events on the UDP socket
+        // Check for events on STDIN
         if (poll_fds[0].revents & POLLIN) {
+            std::cin.getline(buf, BUF_SIZE);
+            if (strcmp(buf, "exit") == 0)
+                break;
+        }
+        // Check for events on the UDP socket
+        if (poll_fds[1].revents & POLLIN) {
             ssize_t n = recvfrom(udp_sock, buf, BUF_SIZE, 0, nullptr, nullptr);
             if (n < 0) {
-                perror("UDP receive failed");
+                std::cerr << "UDP receive failed";
                 continue;
             }
             buf[n] = '\0';
@@ -107,11 +114,29 @@ int main(int argc, char *argv[]) {
             if (strcmp(buf, "exit") == 0)
                 break;
         }
+        // Check for events on the TCP Listen socket
+        if (poll_fds[2].revents & POLLIN) {
+            // Accept incoming connection
+            int aux = sizeof(server_addr);
+            int new_socket = accept(tcp_sock, (struct sockaddr *)&server_addr, (socklen_t*)&aux);
+            
+            // Handle new connection
+            std::cout << "New client connected" << std::endl;
+
+            send(new_socket, "bine ai venit\n", strlen("bine ai venit\n"), 0);
+            recv(new_socket, buf, sizeof(buf), 0);
+            std::cout << buf << std::endl;
+
+            // Close socket
+            close(new_socket);
+        }
 
     }
 
     // Close the UDP socket
     close(udp_sock);
+    // Close the TCP socket
+    close(tcp_sock);
 
     return 0;
 }

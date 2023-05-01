@@ -1,76 +1,61 @@
-#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <poll.h>
+#include <unistd.h>
+
+#define PORT 9090
+#define BUFFER_SIZE 1024
 
 int main() {
-    int listen_fd, conn_fd;
-    struct sockaddr_in serv_addr, cli_addr;
-    socklen_t cli_len = sizeof(cli_addr);
+    int sockfd;
+    char buffer[BUFFER_SIZE];
+    struct sockaddr_in servaddr, cliaddr;
+    socklen_t len = sizeof(cliaddr);
 
-    listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (listen_fd < 0) {
-        std::cerr << "Failed to create socket" << std::endl;
-        return 1;
+    // Create a UDP socket
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("socket creation failed");
+        exit(EXIT_FAILURE);
     }
 
-    int optval = 1;
-    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0) {
-        std::cerr << "Failed to set socket options" << std::endl;
-        return 1;
+    // Set up the server address
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET; // IPv4
+    servaddr.sin_addr.s_addr = INADDR_ANY; // any available interface
+    servaddr.sin_port = htons(PORT);
+
+    // Bind the socket to the server address
+    if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
     }
 
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(9090);
+    // Receive UDP data from the client
+    while (1) {
+        // Wait for data to arrive on the socket
+        ssize_t n = recvfrom(sockfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&cliaddr, &len);
 
-    if (bind(listen_fd, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0) {
-        std::cerr << "Failed to bind socket to address" << std::endl;
-        return 1;
-    }
-
-    if (listen(listen_fd, 10) < 0) {
-        std::cerr << "Failed to listen on socket" << std::endl;
-        return 1;
-    }
-
-    struct pollfd fds[1];
-    fds[0].fd = listen_fd;
-    fds[0].events = POLLIN;
-
-    while (true) {
-        int num_fds = poll(fds, 1, -1);
-        if (num_fds < 0) {
-            std::cerr << "Failed to poll sockets" << std::endl;
-            return 1;
+        // Check if there was an error receiving data
+        if (n < 0) {
+            perror("recvfrom failed");
+            exit(EXIT_FAILURE);
         }
 
-        if (fds[0].revents & POLLIN) {
-            conn_fd = accept(listen_fd, (struct sockaddr*) &cli_addr, &cli_len);
-            if (conn_fd < 0) {
-                std::cerr << "Failed to accept connection" << std::endl;
-                return 1;
-            }
+        // Null-terminate the received data
+        buffer[n] = '\0';
 
-            char buffer[1024];
-            int bytes_read = read(conn_fd, buffer, sizeof(buffer) - 1);
-            if (bytes_read < 0) {
-                std::cerr << "Failed to read data from socket" << std::endl;
-                return 1;
-            }
+        if (strcmp(buffer, "exit") == 0)
+            break;
 
-            buffer[bytes_read] = '\0';
-            std::cout << "Received: " << buffer << std::endl;
-
-            send(conn_fd, "BINE MA\n", 9, 0);
-
-            close(conn_fd);
-        }
+        // Print the received data to stdout
+        printf("Received data from client: %s\n", buffer);
     }
 
-    close(listen_fd);
+
+    // Close the socket
+    close(sockfd);
+
     return 0;
 }

@@ -17,6 +17,10 @@ void eerror(std::string message);
 in_port_t str_to_port(std::string port_str);
 // Process UDP buffer and send notification
 void UDP_input(char* buf, ssize_t len, struct sockaddr_in &addr);
+// Add TCP client socket to poll
+void TCP_add_client(std::vector<pollfd> &poll_fds, int client_fd);
+// Remove TCP client socket from poll
+void TCP_remove_client(std::vector<pollfd> &poll_fds, int index);
 
 int main(int argc, char *argv[]) {
     /* Setup */
@@ -68,7 +72,6 @@ int main(int argc, char *argv[]) {
         eerror("TCP socket listen failed");
     }
 
-
     /* Poll */
     std::vector<pollfd> poll_fds(3);
     poll_fds[0].fd = STDIN_FILENO;
@@ -82,13 +85,25 @@ int main(int argc, char *argv[]) {
     /* Wait for events */
     while (true) {
         if (poll(poll_fds.data(), poll_fds.size(), TIMEOUT) == -1) {
-            eerror("Poll monitoring failed");
+            eerror("Poll failed");
         }
         // Check for events on STDIN
         if (poll_fds[0].revents & POLLIN) {
             std::cin.getline(buf, BUF_SIZE);
             if (strcmp(buf, "exit") == 0)
                 break;
+        }
+        // Check messages from clients
+        for (size_t i = 3; i < poll_fds.size(); i++) {
+            if (poll_fds[i].revents & POLLIN) {
+                ssize_t n = recv(poll_fds[i].fd, buf, sizeof(buf), 0);
+                std::cout << "Recv bytes: " << n << std::endl;
+                buf[4] = '\0';
+                std::cout << "Data: " << buf << std::endl;
+                // Client disconnected
+                if (strcmp(buf, "exit") == 0)
+                    TCP_remove_client(poll_fds, i);
+            }
         }
         // Check for events on the UDP socket
         if (poll_fds[1].revents & POLLIN) {
@@ -104,23 +119,22 @@ int main(int argc, char *argv[]) {
             // Accept incoming connection
             int new_socket = accept(tcp_sock, (struct sockaddr *)&addr, &addr_len);
             
-            // Handle new connection
-            std::cout << "New client connected" << std::endl;
+            if (new_socket < 0) {
+                eerror("TCP client socket creation failed");
+            }
+            // New connection message
+            std::cout << "New client <id here> connected from ";
+            std::cout << inet_ntoa(addr.sin_addr) << ":";
+            std::cout << ntohs(addr.sin_port) << std::endl;
 
-            send(new_socket, "bine ai venit\n", strlen("bine ai venit\n"), 0);
-            recv(new_socket, buf, sizeof(buf), 0);
-            std::cout << buf << std::endl;
-
-            // Close socket
-            close(new_socket);
+            // Add the new file descriptor to the poll vector
+            TCP_add_client(poll_fds, new_socket);
         }
-
     }
-
-    // Close the UDP socket
-    close(udp_sock);
-    // Close the TCP socket
-    close(tcp_sock);
+    // Close the remaining sockets
+    for (size_t i = 1; i < poll_fds.size(); i++) {
+        close(poll_fds[i].fd);
+    }
 
     return 0;
 }
@@ -156,6 +170,21 @@ void UDP_input(char* buf, ssize_t len, struct sockaddr_in &addr) {
     topic = buf;
     *(buf + 50) = c;
 
-
     std::cout << topic << std::endl;
+
+    len++;
+}
+
+void TCP_add_client(std::vector<pollfd> &poll_fds, int client_fd) {
+    pollfd client;
+    client.fd = client_fd;
+    client.events = POLLIN;
+    poll_fds.push_back(client);
+}
+
+void TCP_remove_client(std::vector<pollfd> &poll_fds, int index) {
+    // Close the socket
+    close(poll_fds[index].fd);
+    // Remove the poll entry
+    poll_fds.erase(poll_fds.begin() + index);
 }

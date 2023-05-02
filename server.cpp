@@ -7,8 +7,10 @@
 #include <string>
 #include <vector>
 #include <netinet/tcp.h>
+#include "unite.h"
 
-#define BUF_SIZE 2000
+#define FULLBUF_SIZE 2000
+#define BUF_SIZE 1998
 #define TIMEOUT -1
 
 // Print message to STDERR and exit
@@ -24,7 +26,8 @@ void TCP_remove_client(std::vector<pollfd> &poll_fds, int index);
 
 int main(int argc, char *argv[]) {
     /* Setup */
-    char buf[BUF_SIZE];
+    char fullbuf[FULLBUF_SIZE];
+    char *buf = fullbuf + sizeof(uint16_t);
     if (argc != 2) {
         eerror("./server <PORT>");
     }
@@ -96,10 +99,12 @@ int main(int argc, char *argv[]) {
         // Check messages from clients
         for (size_t i = 3; i < poll_fds.size(); i++) {
             if (poll_fds[i].revents & POLLIN) {
-                ssize_t n = recv(poll_fds[i].fd, buf, sizeof(buf), 0);
+                ssize_t n = recv(poll_fds[i].fd, buf, BUF_SIZE, 0);
                 std::cout << "Recv bytes: " << n << std::endl;
-                buf[4] = '\0';
                 std::cout << "Data: " << buf << std::endl;
+                
+                // TCP_input
+                
                 // Client disconnected
                 if (strcmp(buf, "exit") == 0)
                     TCP_remove_client(poll_fds, i);
@@ -107,12 +112,12 @@ int main(int argc, char *argv[]) {
         }
         // Check for events on the UDP socket
         if (poll_fds[1].revents & POLLIN) {
-            ssize_t len = recvfrom(udp_sock, buf, BUF_SIZE, 0, (struct sockaddr *)&addr, &addr_len);
-            if (len < 0) {
+            ssize_t n = recvfrom(udp_sock, buf, BUF_SIZE, 0, (struct sockaddr *)&addr, &addr_len);
+            if (n < 0) {
                 std::cerr << "UDP receive failed";
                 continue;
             }
-            UDP_input(buf, len, addr);
+            UDP_input(buf, n, addr);
         }
         // Check for events on the TCP Listen socket
         if (poll_fds[2].revents & POLLIN) {
@@ -126,6 +131,9 @@ int main(int argc, char *argv[]) {
             std::cout << "New client <id here> connected from ";
             std::cout << inet_ntoa(addr.sin_addr) << ":";
             std::cout << ntohs(addr.sin_port) << std::endl;
+
+            strcpy(buf, "bine ai venit fram");
+            unite_send(buf, strlen(buf), new_socket);
 
             // Add the new file descriptor to the poll vector
             TCP_add_client(poll_fds, new_socket);
@@ -161,6 +169,7 @@ in_port_t str_to_port(std::string port_str) {
 void UDP_input(char* buf, ssize_t len, struct sockaddr_in &addr) {
     std::cout << inet_ntoa(addr.sin_addr) << std::endl;
     std::cout << ntohs(addr.sin_port) << std::endl;
+    std::cout << len << std::endl;
 
     char c;
     std::string topic;
@@ -172,6 +181,7 @@ void UDP_input(char* buf, ssize_t len, struct sockaddr_in &addr) {
 
     std::cout << topic << std::endl;
 
+    // rem warning
     len++;
 }
 

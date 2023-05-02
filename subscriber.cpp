@@ -29,10 +29,6 @@ int main(int argc, char *argv[]) {
     if (server_ip == INADDR_NONE) {
         eerror("<IP> ~ [0, 255].[0, 255].[0, 255].[0, 255]");
     }
-
-    std::cout << "IP address in dotted decimal notation: " << argv[2] << std::endl;
-    std::cout << "IP address in 32-bit unsigned integer format: " << server_ip << std::endl;
-    std::cout << server_port << std::endl;
     
     // disable STDOUT buffering
     setvbuf(stdout, NULL, _IONBF, BUFSIZ);
@@ -60,7 +56,6 @@ int main(int argc, char *argv[]) {
         eerror("TCP could not connect to remote socket");
     }
 
-
     /* Poll */
     std::vector<pollfd> poll_fds(2);
     poll_fds[0].fd = STDIN_FILENO;
@@ -77,20 +72,17 @@ int main(int argc, char *argv[]) {
         // Check for events on STDIN
         if (poll_fds[0].revents & POLLIN) {
             std::cin.getline(buf, BUF_SIZE);
-            if (strcmp(buf, "exit") == 0)
+            if (strcmp(buf, "exit") == 0) {
+                send(tcp_sock, buf, 5, 0);
                 break;
-            if (strcmp(buf, "send") == 0) {
-                char buffer[1500] = "exit";
-                break;
-                send(tcp_sock, buffer, sizeof(buffer), 0);
             }
         }
         // Check for events on the TCP Listen socket
         if (poll_fds[1].revents & POLLIN) {
             ssize_t n = recv(poll_fds[1].fd, buf, sizeof(buf), 0);
             std::cout << "Recv bytes: " << n << std::endl;
-            buf[4] = '\0';
-            std::cout << "Data: " << buf << std::endl;
+            uint16_t len = *((uint16_t *)buf);
+            std::cout << "Data: " << buf + 2 << std::endl;
         }
     }
     // Close TCP socket

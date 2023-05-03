@@ -7,21 +7,18 @@
 #include <string>
 #include <vector>
 #include <netinet/tcp.h>
-#include "unite.h"
 #include "utils.h"
-
-#define FULLBUF_SIZE 4000
-#define BUF_SIZE 3998
-#define TIMEOUT -1
 
 class Server {
 private:
     // Listening port
     in_port_t port;
-    // Full buffer ([byte]+[buf]) used for TCP Manager
+    // Full buffer ([2 bytes]+[buf])
     char fullbuf[FULLBUF_SIZE];
-    // Data buffer (fullbuf + 1)
+    // Data buffer (fullbuf + 2)
     char *buf;
+    // Data buffer len
+    uint16_t buf_len;
     // General purpose address
     struct sockaddr_in addr;
     // General purpose adress len
@@ -36,7 +33,7 @@ private:
 public:
     Server(char *port) {
         /* Buf */
-        buf = fullbuf + 2;
+        buf = fullbuf + sizeof(uint16_t);
         /* Port */
         this->port = str_to_port(port);
         /* General Purpose Address */
@@ -94,13 +91,10 @@ public:
             }
             // Check for events on the UDP socket
             if (poll_fds[1].revents & POLLIN) {
-                ssize_t n = recvfrom(udp_sock, buf, BUF_SIZE, 0, (struct sockaddr *)&addr, &addr_len);
-                if (n < 0) {
-                    std::cerr << "UDP receive failed";
+                UDP_recv(udp_sock);
+                if (buf_len == 0)
                     continue;
-                }
-                std::cout << n;
-                UDP_input(buf, n, addr);
+                UDP_process();
             }
             // Check for events on the TCP Listen socket
             if (poll_fds[2].revents & POLLIN) {
@@ -117,6 +111,11 @@ public:
 
                 // strcpy(buf, "bine ai veniit!");
                 // unite_send(buf, strlen(buf) + 1, new_socket);
+                char message[100] = "Welcome!";
+                strcpy(buf, message);
+                buf_len = strlen(message) + 1;
+                TCP_send(new_socket);
+                TCP_send(new_socket);
 
                 // Add the new file descriptor to the poll vector
                 TCP_add_client(new_socket);
@@ -170,10 +169,36 @@ private:
         poll_fds.erase(poll_fds.begin() + index);
     }
 
-    void UDP_input(char* buf, ssize_t len, struct sockaddr_in &addr) {
-        std::cout << inet_ntoa(addr.sin_addr) << std::endl;
+    void UDP_recv(int sock_fd) {
+        ssize_t n = recvfrom(sock_fd, buf, BUF_SIZE, 0, (struct sockaddr *)&addr, &addr_len);
+        if (n < 0) {
+            std::cerr << "UDP receive failed";
+        }
+        buf_len = (uint16_t)n;
+    }
+
+    void TCP_send(int sock_fd) {
+        ssize_t n;
+        char *fbuf = fullbuf;
+        uint16_t len = buf_len;
+
+        *((uint16_t *)fbuf) = htons(len);
+        len +=  sizeof(uint16_t);
+        while(len != 0) {
+            n = send(sock_fd, fbuf, (size_t)len, 0);
+            if (n < 0) {
+                eerror("TCP send error");
+            }
+            fbuf += n;
+            len -= (uint16_t)n;
+        }
+    }
+
+    // TODO
+    void UDP_process() {
+        std::cout << inet_ntoa(addr.sin_addr) << ":";
         std::cout << ntohs(addr.sin_port) << std::endl;
-        std::cout << len << std::endl;
+        std::cout << buf_len << std::endl;
 
         char c;
         std::string topic;
@@ -184,9 +209,6 @@ private:
         *(buf + 50) = c;
 
         std::cout << topic << std::endl;
-
-        // rem warning
-        len++;
     }
 
 };

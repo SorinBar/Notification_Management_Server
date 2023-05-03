@@ -7,19 +7,14 @@
 #include <string>
 #include <vector>
 #include <netinet/tcp.h>
+#include "utils.h"
 
 #define BUF_SIZE 2000
 #define TIMEOUT -1
 
-// Print message to STDERR and exit
-void eerror(std::string message);
-// Convert string to in_port_t/uint16_t
-in_port_t str_to_port(std::string port_str);
-
 int main(int argc, char *argv[]) {
     /* Setup */
     char buf[BUF_SIZE];
-    std::cout << argc << std::endl;
     if (argc != 4) {
         eerror("./subscriber <ID> <IP> <PORT>");
     }
@@ -82,6 +77,9 @@ int main(int argc, char *argv[]) {
             ssize_t n = recv(poll_fds[1].fd, buf, sizeof(buf), 0);
             std::cout << "Recv bytes: " << n << std::endl;
             uint16_t len = *((uint16_t *)buf);
+            len = ntohs(len);
+            std::cout << "Data-len: " << len << std::endl;
+            std::cout << "Real-data-len: " << strlen(buf + 2) + 1 << std::endl;
             std::cout << "Data: " << buf + 2 << std::endl;
         }
     }
@@ -89,23 +87,4 @@ int main(int argc, char *argv[]) {
     close(tcp_sock);
 
     return 0;
-}
-
-void eerror(std::string message) {
-    std::cerr << message << std::endl;
-    exit(EXIT_FAILURE);
-}
-
-in_port_t str_to_port(std::string port_str) {
-    int port;
-    try {
-        port = std::stoi(port_str);
-    } catch (const std::exception& e) {
-        eerror("<PORT> ~ [0, 65535]");
-    }
-    if (port < 0 || UINT16_MAX < port) {
-        eerror("<PORT> ~ [0, 65535]");
-    }
-
-    return (in_port_t)port;
 }

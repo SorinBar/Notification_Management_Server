@@ -17,8 +17,6 @@ private:
     char fullbuf[FULLBUF_SIZE];
     // Data buffer (fullbuf + 2)
     char *buf;
-    // Data buffer len
-    uint16_t buf_len;
     // General purpose address
     struct sockaddr_in addr;
     // General purpose adress len
@@ -87,39 +85,32 @@ public:
                     // Client disconnected
                     if (strcmp(buf, "exit") == 0) {
                         TCP_remove_client(i);
-                        std::cout << "disconnected\n";
                     }
                 }
             }
             // Check for events on the UDP socket
             if (poll_fds[1].revents & POLLIN) {
-                UDP_recv(udp_sock);
-                if (buf_len == 0)
+                uint16_t len = UDP_recv(udp_sock);
+                if (len == 0)
                     continue;
-                UDP_process();
+                UDP_process(len);
             }
             // Check for events on the TCP Listen socket
             if (poll_fds[2].revents & POLLIN) {
                 // Accept incoming connection
                 int new_socket = TCP_accept();
 
-                // // New connection message
-                // std::cout << "New client <id here> connected from ";
-                // std::cout << inet_ntoa(addr.sin_addr) << ":";
-                // std::cout << ntohs(addr.sin_port) << std::endl;
+                *((uint16_t *)buf) = htons(10);
+                strcpy(buf + 2, "aaaaaab");
+                *((uint16_t *)(buf + 10)) = htons(5);
+                strcpy(buf + 12, "AB");
 
-                // strcpy(buf, "bine ai veniit!");
-                // unite_send(buf, strlen(buf) + 1, new_socket);
-                char message1[100] = "Welcome1!";
-                char message2[100] = "Welcome2!";
-                strcpy(buf, message1);
-                buf_len = strlen(message1) + 1;
-                TCP_send(new_socket);
-
-                strcpy(buf, message2);
-                buf_len = strlen(message2) + 1;
-                TCP_send(new_socket);
-
+                send(new_socket, buf, 5, 0);
+                usleep(100000);
+                send(new_socket, buf + 5, 6, 0);
+                usleep(100000);
+                send(new_socket, buf + 11, 4, 0);
+                
                 // Add the new file descriptor to the poll vector
                 TCP_add_client(new_socket);
             }
@@ -190,18 +181,17 @@ private:
         poll_fds.erase(poll_fds.begin() + index);
     }
 
-    void UDP_recv(int sock_fd) {
+    uint16_t UDP_recv(int sock_fd) {
         ssize_t n = recvfrom(sock_fd, buf, BUF_SIZE, 0, (struct sockaddr *)&addr, &addr_len);
         if (n < 0) {
             std::cerr << "UDP receive failed";
         }
-        buf_len = (uint16_t)n;
+        return (uint16_t)n;
     }
 
-    void TCP_send(int sock_fd) {
+    void TCP_send(int sock_fd, uint16_t len) {
         ssize_t n;
         char *fbuf = fullbuf;
-        uint16_t len = buf_len;
 
         len +=  sizeof(uint16_t);
         *((uint16_t *)fbuf) = htons(len);
@@ -216,10 +206,10 @@ private:
     }
 
     // TODO
-    void UDP_process() {
+    void UDP_process(uint16_t len) {
         std::cout << inet_ntoa(addr.sin_addr) << ":";
         std::cout << ntohs(addr.sin_port) << std::endl;
-        std::cout << buf_len << std::endl;
+        std::cout << len << std::endl;
 
         char c;
         std::string topic;

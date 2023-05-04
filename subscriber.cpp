@@ -116,7 +116,7 @@ private:
         right = fullbuf + n;
         
         while(left != right) {
-            std::cout << "loop\n";
+            std::cout << "\n";
             // Received one byte
             if (right - left == 1) {
                 n = recv(sock_fd, right, FULLBUF_SIZE - 1, 0);
@@ -143,7 +143,7 @@ private:
                     // Received enough bytes to process the first packet
                     buf_len = pack_len - sizeof(uint16_t);
                     
-                    // TODO Function that process the data
+                    // TODO
                     recv_tester();
 
                     // Move the unprocessed bytes to the left

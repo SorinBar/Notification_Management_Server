@@ -85,8 +85,10 @@ public:
                     // TCP_input
                     
                     // Client disconnected
-                    if (strcmp(buf, "exit") == 0)
+                    if (strcmp(buf, "exit") == 0) {
                         TCP_remove_client(i);
+                        std::cout << "disconnected\n";
+                    }
                 }
             }
             // Check for events on the UDP socket
@@ -99,11 +101,8 @@ public:
             // Check for events on the TCP Listen socket
             if (poll_fds[2].revents & POLLIN) {
                 // Accept incoming connection
-                int new_socket = accept(tcp_sock, (struct sockaddr *)&addr, &addr_len);
-                
-                if (new_socket < 0) {
-                    eerror("TCP client socket creation failed");
-                }
+                int new_socket = TCP_accept();
+
                 // // New connection message
                 // std::cout << "New client <id here> connected from ";
                 // std::cout << inet_ntoa(addr.sin_addr) << ":";
@@ -111,10 +110,14 @@ public:
 
                 // strcpy(buf, "bine ai veniit!");
                 // unite_send(buf, strlen(buf) + 1, new_socket);
-                char message[100] = "Welcome!";
-                strcpy(buf, message);
-                buf_len = strlen(message) + 1;
+                char message1[100] = "Welcome1!";
+                char message2[100] = "Welcome2!";
+                strcpy(buf, message1);
+                buf_len = strlen(message1) + 1;
                 TCP_send(new_socket);
+
+                strcpy(buf, message2);
+                buf_len = strlen(message2) + 1;
                 TCP_send(new_socket);
 
                 // Add the new file descriptor to the poll vector
@@ -142,9 +145,13 @@ private:
         }
         // Deactivate Nagle algorithm
         int flag = 1;
-        if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)) != 0) {
+        if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(int)) != 0) {
             eerror("TCP socket nodelay failed");
         }
+        // Make socket reusable
+        if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(int)) < 0)
+            eerror("TCO socket reusable failed");
+
         if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
             eerror("TCP socket bind failed");
         }
@@ -153,6 +160,20 @@ private:
             eerror("TCP socket listen failed");
         }
         return sock;
+    }
+
+    int TCP_accept() {
+        // Accept incoming connection
+        int new_socket = accept(tcp_sock, (struct sockaddr *)&addr, &addr_len);
+        if (new_socket < 0) {
+            eerror("TCP client socket creation failed");
+        }
+        // Deactivate Nagle algorithm
+        int flag = 1;
+        if (setsockopt(new_socket, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(int)) != 0) {
+            eerror("TCP socket nodelay failed");
+        }
+        return new_socket;
     }
 
     void TCP_add_client(int fd) {
@@ -182,8 +203,8 @@ private:
         char *fbuf = fullbuf;
         uint16_t len = buf_len;
 
-        *((uint16_t *)fbuf) = htons(len);
         len +=  sizeof(uint16_t);
+        *((uint16_t *)fbuf) = htons(len);
         while(len != 0) {
             n = send(sock_fd, fbuf, (size_t)len, 0);
             if (n < 0) {

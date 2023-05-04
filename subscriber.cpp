@@ -102,11 +102,65 @@ private:
         }
         return sock;
     }
+    
     void TCP_recv(int sock_fd) {
-        std::cout << recv(sock_fd, fullbuf, BUF_SIZE, 0) << std::endl;
-        uint16_t len = ntohs(*((uint16_t *)fullbuf));
-        std::cout << len << std::endl;
-        std::cout << buf << std::endl;
+        ssize_t n;
+        uint16_t pack_len, recv_len, diff_len;
+        char *left, *right;
+        
+        left = fullbuf;
+        n = recv(sock_fd, fullbuf, FULLBUF_SIZE, 0);
+        if (n < 0) {
+            eerror("TCP recv error");
+        }
+        right = fullbuf + n;
+        
+        while(left != right) {
+            std::cout << "loop\n";
+            // Received one byte
+            if (right - left == 1) {
+                n = recv(sock_fd, right, FULLBUF_SIZE - 1, 0);
+                if (n < 0) {
+                    eerror("TCP recv error");
+                }
+                right += n;
+            } else {
+                // Received at least 2 bytes
+                pack_len = ntohs(*((uint16_t *)left));
+                recv_len = right - left;
+
+                std::cout << "Packet len: " << pack_len << std::endl;
+                std::cout << "Recv len: " << recv_len << std::endl;
+
+                // Packet is not fully received
+                if (pack_len > recv_len) {
+                    n = recv(sock_fd, right, FULLBUF_SIZE - 1, 0);
+                    if (n < 0) {
+                        eerror("TCP recv error");
+                    }
+                    right += n;
+                } else {
+                    // Received enough bytes to process the first packet
+                    buf_len = pack_len - sizeof(uint16_t);
+                    
+                    // TODO Function that process the data
+                    recv_tester();
+
+                    // Move the unprocessed bytes to the left
+                    diff_len = recv_len - pack_len;
+                    left += pack_len;
+                    memmove(fullbuf, left, diff_len);
+                    left = fullbuf;
+                    right = left + diff_len;
+                }
+            }
+        }
+    }
+
+    // TODO
+    void recv_tester() {
+        std::cout << "Message len: " << buf_len << std::endl;
+        std::cout << "Message: " << buf << std::endl;
     }
 };
 

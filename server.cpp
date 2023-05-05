@@ -8,6 +8,7 @@
 #include <vector>
 #include <netinet/tcp.h>
 #include "utils.h"
+#include "fast_forward.h"
 
 class Server {
 private:
@@ -93,23 +94,12 @@ public:
                 uint16_t len = UDP_recv(udp_sock);
                 if (len == 0)
                     continue;
-                UDP_process(len);
+                UDP_forward(len);
             }
             // Check for events on the TCP Listen socket
             if (poll_fds[2].revents & POLLIN) {
                 // Accept incoming connection
                 int new_socket = TCP_accept();
-
-                *((uint16_t *)buf) = htons(10);
-                strcpy(buf + 2, "aaaaaab");
-                *((uint16_t *)(buf + 10)) = htons(5);
-                strcpy(buf + 12, "AB");
-
-                send(new_socket, buf, 5, 0);
-                usleep(100000);
-                send(new_socket, buf + 5, 6, 0);
-                usleep(100000);
-                send(new_socket, buf + 11, 4, 0);
                 
                 // Add the new file descriptor to the poll vector
                 TCP_add_client(new_socket);
@@ -205,21 +195,78 @@ private:
         }
     }
 
+    void TCP_recv(int sock_fd) {
+        ssize_t n;
+        uint16_t pack_len, recv_len, diff_len;
+        char *left, *right;
+        
+        left = fullbuf;
+        n = recv(sock_fd, fullbuf, FULLBUF_SIZE, 0);
+        if (n < 0) {
+            eerror("TCP recv error");
+        }
+        right = fullbuf + n;
+        
+        while(left != right) {
+            // Received one byte
+            if (right - left == 1) {
+                n = recv(sock_fd, right, FULLBUF_SIZE - 1, 0);
+                if (n < 0) {
+                    eerror("TCP recv error");
+                }
+                right += n;
+            } else {
+                // Received at least 2 bytes
+                pack_len = ntohs(*((uint16_t *)left));
+                recv_len = right - left;
+
+                // Packet is not fully received
+                if (pack_len > recv_len) {
+                    n = recv(sock_fd, right, FULLBUF_SIZE - 1, 0);
+                    if (n < 0) {
+                        eerror("TCP recv error");
+                    }
+                    right += n;
+                } else {
+                    // Received enough bytes to process the first packet
+                    packageProcess(pack_len - sizeof(uint16_t));
+
+                    // Move the unprocessed bytes to the left
+                    diff_len = recv_len - pack_len;
+                    left += pack_len;
+                    memmove(fullbuf, left, diff_len);
+                    left = fullbuf;
+                    right = left + diff_len;
+                }
+            }
+        }
+    }
+
     // TODO
-    void UDP_process(uint16_t len) {
-        std::cout << inet_ntoa(addr.sin_addr) << ":";
-        std::cout << ntohs(addr.sin_port) << std::endl;
-        std::cout << len << std::endl;
+    void packageProcess(uint16_t len) {
+        std::cout << "Packet len: " << len << std::endl;
+    }
 
-        char c;
+    void UDP_forward(uint16_t len) {
         std::string topic;
+        ff_ftr ftr;
+        char c;
 
+        // Extract the topic
         c = *(buf + 50);
         *(buf + 50) = '\0';
         topic = buf;
         *(buf + 50) = c;
 
-        std::cout << topic << std::endl;
+        // Create the fast forward footer
+        ftr.s_addr = addr.sin_addr.s_addr;
+        ftr.s_port = addr.sin_port;
+        ftr.protocol = FF_PROTOCOL;
+
+        len = ff_pack(buf, len, ftr);
+
+        // Sending
+        TCP_send(5, len);
     }
 
 };

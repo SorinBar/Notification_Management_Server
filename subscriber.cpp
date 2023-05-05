@@ -7,16 +7,21 @@
 #include <string>
 #include <vector>
 #include <netinet/tcp.h>
+#include <cmath>
 #include "utils.h"
+#include "fast_forward.h"
+
+#define INT 0
+#define SHORT_REAL 1
+#define FLOAT 2
+#define STRING 3
 
 class Subscriber {
 private:
-     // Full buffer ([2 bytes]+[buf])
+    // Full buffer ([2 bytes]+[buf])
     char fullbuf[FULLBUF_SIZE];
     // Data buffer (fullbuf + 2)
     char *buf;
-    // Data buffer len
-    uint16_t buf_len;
     // Client ID
     std::string id;
     // Server IP
@@ -103,6 +108,22 @@ private:
         return sock;
     }
     
+    void TCP_send(int sock_fd, uint16_t len) {
+        ssize_t n;
+        char *fbuf = fullbuf;
+
+        len +=  sizeof(uint16_t);
+        *((uint16_t *)fbuf) = htons(len);
+        while(len != 0) {
+            n = send(sock_fd, fbuf, (size_t)len, 0);
+            if (n < 0) {
+                eerror("TCP send error");
+            }
+            fbuf += n;
+            len -= (uint16_t)n;
+        }
+    }
+
     void TCP_recv(int sock_fd) {
         ssize_t n;
         uint16_t pack_len, recv_len, diff_len;
@@ -129,9 +150,6 @@ private:
                 pack_len = ntohs(*((uint16_t *)left));
                 recv_len = right - left;
 
-                std::cout << "Packet len: " << pack_len << std::endl;
-                std::cout << "Recv len: " << recv_len << std::endl;
-
                 // Packet is not fully received
                 if (pack_len > recv_len) {
                     n = recv(sock_fd, right, FULLBUF_SIZE - 1, 0);
@@ -141,10 +159,7 @@ private:
                     right += n;
                 } else {
                     // Received enough bytes to process the first packet
-                    buf_len = pack_len - sizeof(uint16_t);
-                    
-                    // TODO
-                    recv_tester();
+                    packageProcess(pack_len - sizeof(uint16_t));
 
                     // Move the unprocessed bytes to the left
                     diff_len = recv_len - pack_len;
@@ -158,9 +173,99 @@ private:
     }
 
     // TODO
-    void recv_tester() {
-        std::cout << "Message len: " << buf_len << std::endl;
-        std::cout << "Message: " << buf << std::endl;
+    void packageProcess(uint16_t len) {
+        // Check the protocol of the package
+        uint8_t protocol = *((uint8_t *)(buf + len - sizeof(uint8_t)));
+        if (protocol == FF_PROTOCOL) {
+            ff_ftr ftr;
+            struct in_addr addr;
+            std::string topic;
+            char *buf_p;
+            char c;
+
+            buf_p = buf;
+            ftr = ff_unpack(buf_p, &len);
+
+            // Print UDP sender address and port
+            addr.s_addr = ftr.s_addr;
+            std::cout << inet_ntoa(addr) << ":" << ntohs(ftr.s_port);
+            std::cout << " - ";
+
+            // Extract the topic
+            c = *(buf_p + 50);
+            *(buf_p + 50) = '\0';
+            topic = buf_p;
+            *(buf_p + 50) = c;
+
+            std::cout << topic;
+            std::cout << " - ";
+
+            // Extract the type
+            buf_p += 50;
+            uint8_t type = (*((uint8_t *)buf_p));
+            
+            // Extract the content
+            buf_p += sizeof(uint8_t);
+            
+            if (type == INT) {
+                std::cout << "INT - ";
+
+                uint8_t sign;
+                uint32_t digits;
+
+                sign = *((uint8_t *)buf_p);
+                buf_p += sizeof(uint8_t);
+                digits = ntohl(*((uint32_t *)buf_p));
+                buf_p += sizeof(uint32_t);
+
+
+                if (sign) {
+                    std::cout << "-" << digits;
+                } else {
+                    std::cout << digits;
+                }
+
+            } else if (type == SHORT_REAL) {
+                std::cout << "SHORT REAL - ";
+
+                uint16_t digits;
+
+                digits = ntohs(*((uint16_t *)buf_p));
+                buf_p += sizeof(uint16_t);
+
+                fprintf(stdout, "%.2f", (float)digits / 100);
+
+            } else if (type == FLOAT) {
+                std::cout << "FLOAT - ";
+
+                uint8_t sign;
+                uint32_t digits;
+                uint8_t neg_pow;
+                double number;
+
+                sign = *((uint8_t *)buf_p);
+                buf_p += sizeof(uint8_t);
+                digits = ntohl(*((uint32_t *)buf_p));
+                buf_p += sizeof(uint32_t);
+                neg_pow = *((uint8_t *)buf_p);
+                buf_p += sizeof(uint8_t);
+
+
+                number = (double)digits;
+                if (sign) {
+                    number *= -1;
+                }
+                number /= pow(10, neg_pow);
+                std::cout << number;
+
+
+            } else if (type == STRING) {
+                std::cout << "STRING - ";
+
+            }
+
+            std::cout << std::endl;
+        }
     }
 };
 

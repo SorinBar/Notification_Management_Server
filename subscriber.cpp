@@ -8,6 +8,7 @@
 #include <vector>
 #include <netinet/tcp.h>
 #include <cmath>
+#include <iomanip>
 #include "utils.h"
 #include "fast_forward.h"
 
@@ -233,7 +234,8 @@ private:
                 digits = ntohs(*((uint16_t *)buf_p));
                 buf_p += sizeof(uint16_t);
 
-                fprintf(stdout, "%.2f", (float)digits / 100);
+                std::cout << std::fixed;
+                std::cout  << std::setprecision(2) << (double)digits / 100;
 
             } else if (type == FLOAT) {
                 std::cout << "FLOAT - ";
@@ -256,12 +258,18 @@ private:
                     number *= -1;
                 }
                 number /= pow(10, neg_pow);
-                std::cout << number;
-
+                std::cout << std::fixed;
+                std::cout  << std::setprecision(neg_pow) << number;
 
             } else if (type == STRING) {
                 std::cout << "STRING - ";
 
+                c = *(buf_p + len);
+                *(buf_p + len) = '\0';
+
+                std::cout << buf_p;
+                
+                *(buf_p + len) = c;
             }
 
             std::cout << std::endl;

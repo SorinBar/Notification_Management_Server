@@ -11,6 +11,7 @@
 #include <iomanip>
 #include "utils.h"
 #include "fast_forward.h"
+#include "command.h"
 
 #define INT 0
 #define SHORT_REAL 1
@@ -37,6 +38,8 @@ private:
     int tcp_sock;
     // Poll
     std::vector<pollfd> poll_fds;
+    // CMD Structure
+    command cmd;
 
 
 public:
@@ -62,6 +65,8 @@ public:
         poll_fds[0].events = POLLIN;
         poll_fds[1].fd = tcp_sock;
         poll_fds[1].events = POLLIN;
+        /* Command */
+        cmd = {};
     }
 
     ~Subscriber() {
@@ -70,6 +75,9 @@ public:
     }
 
     void start() {
+        /* Send connect message to server */
+        CMD_connect();
+
         /* Wait for events */
         while (true) {
             if (poll(poll_fds.data(), poll_fds.size(), TIMEOUT) == -1) {
@@ -173,7 +181,7 @@ private:
         }
     }
 
-    // TODO
+    // ADD Exit Case
     void packageProcess(uint16_t len) {
         // Check the protocol of the package
         uint8_t protocol = *((uint8_t *)(buf + len - sizeof(uint8_t)));
@@ -274,6 +282,13 @@ private:
 
             std::cout << std::endl;
         }
+    }
+
+    void CMD_connect() {
+        cmd.type = CMD_CONNECT;
+        strcpy(cmd.id, id.c_str());
+        cmd_pack(buf, &cmd);
+        TCP_send(tcp_sock, (uint16_t)sizeof(command));
     }
 };
 

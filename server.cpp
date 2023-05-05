@@ -9,6 +9,10 @@
 #include <netinet/tcp.h>
 #include "utils.h"
 #include "fast_forward.h"
+#include "command.h"
+
+#define FLAG_SUCCESS 0
+#define FLAG_FAIL 1
 
 class Server {
 private:
@@ -28,6 +32,8 @@ private:
     int tcp_sock;
     // Poll
     std::vector<pollfd> poll_fds;
+    // Flag
+    int flag;
 
 public:
     Server(char *port) {
@@ -53,6 +59,8 @@ public:
         poll_fds[1].events = POLLIN;
         poll_fds[2].fd = tcp_sock;
         poll_fds[2].events = POLLIN;
+        /* Flag */
+        flag = FLAG_SUCCESS;
     }
 
     ~Server() {
@@ -85,7 +93,7 @@ public:
                     
                     // Client disconnected
                     if (strcmp(buf, "exit") == 0) {
-                        TCP_remove_client(i);
+                        poll_remove_client(i);
                     }
                 }
             }
@@ -100,9 +108,10 @@ public:
             if (poll_fds[2].revents & POLLIN) {
                 // Accept incoming connection
                 int new_socket = TCP_accept();
+                TCP_recv(new_socket);
                 
                 // Add the new file descriptor to the poll vector
-                TCP_add_client(new_socket);
+                poll_add_client(new_socket);
             }
         }
     }
@@ -157,14 +166,14 @@ private:
         return new_socket;
     }
 
-    void TCP_add_client(int fd) {
+    void poll_add_client(int fd) {
         pollfd client;
         client.fd = fd;
         client.events = POLLIN;
         poll_fds.push_back(client);
     }
 
-    void TCP_remove_client(int index) {
+    void poll_remove_client(int index) {
         // Close the socket
         close(poll_fds[index].fd);
         // Remove the poll entry
@@ -229,7 +238,7 @@ private:
                     right += n;
                 } else {
                     // Received enough bytes to process the first packet
-                    packageProcess(pack_len - sizeof(uint16_t));
+                    packageProcess();
 
                     // Move the unprocessed bytes to the left
                     diff_len = recv_len - pack_len;
@@ -243,10 +252,20 @@ private:
     }
 
     // TODO
-    void packageProcess(uint16_t len) {
-        std::cout << "Packet len: " << len << std::endl;
-    }
+    void packageProcess() {
+        command cmd = cmd_unpack(buf);
 
+        // Debug
+        std::cout << (int)(cmd.type) << std::endl;
+        std::cout << cmd.id << std::endl;
+        std::cout << cmd.topic << std::endl;
+        std::cout << (int)(cmd.sf) << std::endl;
+        std::cout << (int)(cmd.protocol) << std::endl;
+
+
+
+    }
+    // TODO
     void UDP_forward(uint16_t len) {
         std::string topic;
         ff_ftr ftr;

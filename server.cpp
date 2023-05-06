@@ -313,7 +313,6 @@ private:
         subscribers = topicsDB.getTopic(topic);
         if (subscribers != NULL) {
             for (auto &id : *subscribers) {
-                std::cout << id << std::endl;
                 data = clientsDB.getClient(id);
                 if (data != NULL)
                     TCP_send(data->fd, len);

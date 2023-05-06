@@ -258,12 +258,12 @@ private:
 
         if (cmd.type == CMD_CONNECT) {
             if (clientsDB.connect(cmd.id, sock_fd) == -1) {
-                std::cout << "Client " << cmd.id << " already connected." << std::endl;
+                std::cout << "Client " << cmd.id << " already connected." << "\n";
                 CMD_exit(sock_fd);
             } else {
                 poll_add_client(sock_fd);
                 std::cout << "New client " << cmd.id << " connected from ";
-                std::cout << inet_ntoa(addr.sin_addr) << ":" << ntohs(addr.sin_port) << std::endl;
+                std::cout << inet_ntoa(addr.sin_addr) << ":" << ntohs(addr.sin_port) << ".\n";
             }
         }
         if (cmd.type == CMD_EXIT) {
@@ -272,7 +272,7 @@ private:
             if (data != NULL) {
                 poll_remove_client(poll_index);
                 clientsDB.disconnect(cmd.id);
-                std::cout << "Client " << cmd.id << " disconnected." << std::endl;
+                std::cout << "Client " << cmd.id << " disconnected." << "\n";
             }
         }
         if (cmd.type == CMD_SUBSCRIBE) {
@@ -314,8 +314,12 @@ private:
         if (subscribers != NULL) {
             for (auto &id : *subscribers) {
                 data = clientsDB.getClient(id);
-                if (data != NULL)
-                    TCP_send(data->fd, len);
+                if (data != NULL) {
+                    // If client is connected
+                    if (data->fd != -1) {
+                        TCP_send(data->fd, len);
+                    }
+                }
             }
         }
     }

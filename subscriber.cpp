@@ -104,19 +104,19 @@ public:
                 
                 if (type == CMD_SUBSCRIBE) {
                     CMD_subscribe(&topic, sf);
-                    std::cout << "Subscribed to topic." << std::endl;
+                    std::cout << "Subscribed to topic.\n";
                 }
                 
                 if (type == CMD_UNSUBSCRIBE) {
                     CMD_unsubscribe(&topic);
-                    std::cout << "Unsubscribed to topic." << std::endl;
+                    std::cout << "Unsubscribed to topic.\n";
                 }
 
-                // if (type == BAD_INPUT) {
-                //     std::cout << "subscribe <TOPIC> <SF>" << std::endl;
-                //     std::cout << "unsubscribe <TOPIC>" << std::endl;
-                //     std::cout << "exit" << std::endl;
-                // }
+                if (type == BAD_INPUT) {
+                    std::cout << "subscribe <TOPIC> <SF>\n";
+                    std::cout << "unsubscribe <TOPIC>\n";
+                    std::cout << "exit\n";
+                }
             }
             // Check for events on the TCP Listen socket
             if (poll_fds[1].revents & POLLIN) {
@@ -173,7 +173,6 @@ private:
         right = fullbuf + n;
         
         while(left != right) {
-            std::cout << "\n";
             // Received one byte
             if (right - left == 1) {
                 n = recv(sock_fd, right, FULLBUF_SIZE - 1, 0);
@@ -255,13 +254,13 @@ private:
 
 
                 if (sign) {
-                    std::cout << "-" << digits;
+                    std::cout << "-" << digits << "\n";
                 } else {
-                    std::cout << digits;
+                    std::cout << digits << "\n";
                 }
 
             } else if (type == SHORT_REAL) {
-                std::cout << "SHORT REAL - ";
+                std::cout << "SHORT_REAL - ";
 
                 uint16_t digits;
 
@@ -269,7 +268,7 @@ private:
                 buf_p += sizeof(uint16_t);
 
                 std::cout << std::fixed;
-                std::cout  << std::setprecision(2) << (double)digits / 100;
+                std::cout  << std::setprecision(2) << (double)digits / 100 << "\n";
 
             } else if (type == FLOAT) {
                 std::cout << "FLOAT - ";
@@ -293,7 +292,7 @@ private:
                 }
                 number /= pow(10, neg_pow);
                 std::cout << std::fixed;
-                std::cout  << std::setprecision(neg_pow) << number;
+                std::cout  << std::setprecision(neg_pow) << number << "\n";
 
             } else if (type == STRING) {
                 std::cout << "STRING - ";
@@ -301,12 +300,11 @@ private:
                 c = *(buf_p + len);
                 *(buf_p + len) = '\0';
 
-                std::cout << buf_p;
+                std::cout << buf_p << "\n";
                 
                 *(buf_p + len) = c;
             }
 
-            std::cout << std::endl;
         } else if (protocol == CMD_PROTOCOL) {
             cmd = cmd_unpack(buf);
 

@@ -1,19 +1,43 @@
 #include "clientsDatabase.h"
 
+ClientsDB::~ClientsDB() {
+    for (auto pair:clients)
+        delete pair.second;
+}
+
 int ClientsDB::connect(std::string id, int fd) {
-    clientData data;
+    clientData *data;
     if (clients.count(id)) {
-        clientData data = clients[id];
+        data = clients[id];
         // Already connected
-        if (data.fd != -1)
+        if (data->fd != -1)
             return -1;
         else {
-            // Connect client
-            data.fd = fd;
-            clients[id] = data;
+            // Connect the client
+            data->fd = fd;
         }
     } else {
-        
-        clients.insert({});
+        clientData *data = new clientData;
+        data->fd = fd;
+        data->sf = 0;
+
+        clients.insert({id, data});
     }
+
+    return 0;
+}
+
+clientData *ClientsDB::getClient(std::string id) {
+    if(clients.count(id))
+        return clients[id];
+    else
+        return NULL;
+}
+
+int ClientsDB::disconnect(std::string id) {
+    if (clients.count(id)) {
+        clients[id]->fd = -1;   
+        return 0;
+    }
+    return 1;
 }

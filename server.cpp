@@ -10,6 +10,8 @@
 #include "utils.h"
 #include "fast_forward.h"
 #include "command.h"
+#include "clientsDatabase.h"
+#include "topicsDatabase.h"
 
 #define FLAG_SUCCESS 0
 #define FLAG_FAIL 1
@@ -34,6 +36,10 @@ private:
     std::vector<pollfd> poll_fds;
     // Flag
     int flag;
+    // Clients Database
+    ClientsDB clientsDB;
+    // Topics Database
+    TopicsDB topicsDB;
 
 public:
     Server(char *port) {

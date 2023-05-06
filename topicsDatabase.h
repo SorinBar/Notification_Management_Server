@@ -13,7 +13,7 @@
     public:
         void subscribe(std::string topic, std::string id);
         void unsubscribe(std::string topic, std::string id);
-        std::unordered_set<std::string> *getTopic(std::string id);
+        std::unordered_set<std::string> *getTopic(std::string topic);
     };
 
 #endif

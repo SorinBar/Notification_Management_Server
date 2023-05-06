@@ -104,17 +104,19 @@ public:
                 
                 if (type == CMD_SUBSCRIBE) {
                     CMD_subscribe(&topic, sf);
+                    std::cout << "Subscribed to topic." << std::endl;
                 }
                 
                 if (type == CMD_UNSUBSCRIBE) {
                     CMD_unsubscribe(&topic);
+                    std::cout << "Unsubscribed to topic." << std::endl;
                 }
 
-                if (type == BAD_INPUT) {
-                    std::cout << "subscribe <TOPIC> <SF>" << std::endl;
-                    std::cout << "unsubscribe <TOPIC>" << std::endl;
-                    std::cout << "exit" << std::endl;
-                }
+                // if (type == BAD_INPUT) {
+                //     std::cout << "subscribe <TOPIC> <SF>" << std::endl;
+                //     std::cout << "unsubscribe <TOPIC>" << std::endl;
+                //     std::cout << "exit" << std::endl;
+                // }
             }
             // Check for events on the TCP Listen socket
             if (poll_fds[1].revents & POLLIN) {
@@ -320,14 +322,17 @@ private:
         if (strcmp(buf, "exit") == 0) {
             return CMD_EXIT;
         }
-        token = strtok(buf, "  ");
+        token = strtok(buf, " ");
+        // Bad input
+        if (token == NULL)
+            return BAD_INPUT;
         // Subscribe
         if (strcmp(token, "subscribe") == 0) {
             // Topic
             token = strtok(NULL, " ");
             if (token == NULL)
                 return BAD_INPUT;
-            if (strlen(token) > 10)
+            if (strlen(token) > 50)
                 return BAD_INPUT;
             *topic = token;
             // SF

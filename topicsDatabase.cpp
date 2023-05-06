@@ -9,9 +9,9 @@ void TopicsDB::unsubscribe(std::string topic, std::string id) {
         topics[topic].erase(id);
 }
 
-std::unordered_set<std::string> *TopicsDB::getTopic(std::string id) {
-    if (topics.count(id))
-        return &(topics[id]);
+std::unordered_set<std::string> *TopicsDB::getTopic(std::string topic) {
+    if (topics.count(topic))
+        return &(topics[topic]);
     
     return NULL;
 }

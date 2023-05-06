@@ -291,9 +291,11 @@ private:
 
     // TODO
     void UDP_forward(uint16_t len) {
-        std::string topic;
-        ff_ftr ftr;
         char c;
+        ff_ftr ftr;
+        clientData *data;
+        std::string topic;
+        std::unordered_set<std::string> *subscribers;
 
         // Extract the topic
         c = *(buf + 50);
@@ -308,8 +310,15 @@ private:
 
         len = ff_pack(buf, len, ftr);
 
-        // Sending
-        //TCP_send(5, len);
+        subscribers = topicsDB.getTopic(topic);
+        if (subscribers != NULL) {
+            for (auto &id : *subscribers) {
+                std::cout << id << std::endl;
+                data = clientsDB.getClient(id);
+                if (data != NULL)
+                    TCP_send(data->fd, len);
+            }
+        }
     }
 
 };

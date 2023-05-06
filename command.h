@@ -5,8 +5,8 @@
     
     #define CMD_PROTOCOL 1
     #define CMD_CONNECT 0
-    #define CMD_SUB 1
-    #define CMD_UNSUB 2
+    #define CMD_SUBSCRIBE 1
+    #define CMD_UNSUBSCRIBE 2
     #define CMD_EXIT 3
 
     typedef struct {

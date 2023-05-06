@@ -36,6 +36,8 @@ private:
     std::vector<pollfd> poll_fds;
     // Flag
     int flag;
+    // CMD Structure
+    command cmd;
     // Clients Database
     ClientsDB clientsDB;
     // Topics Database
@@ -67,6 +69,8 @@ public:
         poll_fds[2].events = POLLIN;
         /* Flag */
         flag = FLAG_SUCCESS;
+        /* Command */
+        cmd = {};
     }
 
     ~Server() {
@@ -85,22 +89,17 @@ public:
             // Check for events on STDIN
             if (poll_fds[0].revents & POLLIN) {
                 std::cin.getline(buf, BUF_SIZE);
-                if (strcmp(buf, "exit") == 0)
+                if (strcmp(buf, "exit") == 0) {
+                    for (size_t i = 3; i < poll_fds.size(); i++) {
+                        CMD_exit(poll_fds[i].fd);
+                    }
                     break;
+                }
             }
             // Check messages from clients
             for (size_t i = 3; i < poll_fds.size(); i++) {
                 if (poll_fds[i].revents & POLLIN) {
-                    ssize_t n = recv(poll_fds[i].fd, buf, BUF_SIZE, 0);
-                    std::cout << "Recv bytes: " << n << std::endl;
-                    std::cout << "Data: " << buf << std::endl;
-                    
-                    // TCP_input
-                    
-                    // Client disconnected
-                    if (strcmp(buf, "exit") == 0) {
-                        poll_remove_client(i);
-                    }
+                    TCP_recv(poll_fds[i].fd, i);
                 }
             }
             // Check for events on the UDP socket
@@ -114,10 +113,7 @@ public:
             if (poll_fds[2].revents & POLLIN) {
                 // Accept incoming connection
                 int new_socket = TCP_accept();
-                TCP_recv(new_socket);
-                
-                // Add the new file descriptor to the poll vector
-                poll_add_client(new_socket);
+                TCP_recv(new_socket, 2);
             }
         }
     }
@@ -210,7 +206,7 @@ private:
         }
     }
 
-    void TCP_recv(int sock_fd) {
+    void TCP_recv(int sock_fd, int poll_index) {
         ssize_t n;
         uint16_t pack_len, recv_len, diff_len;
         char *left, *right;
@@ -244,7 +240,7 @@ private:
                     right += n;
                 } else {
                     // Received enough bytes to process the first packet
-                    packageProcess();
+                    packageProcess(sock_fd, poll_index);
 
                     // Move the unprocessed bytes to the left
                     diff_len = recv_len - pack_len;
@@ -258,19 +254,47 @@ private:
     }
 
     // TODO
-    void packageProcess() {
+    void packageProcess(int sock_fd, int poll_index) {
         command cmd = cmd_unpack(buf);
 
         // Debug
-        std::cout << (int)(cmd.type) << std::endl;
-        std::cout << cmd.id << std::endl;
-        std::cout << cmd.topic << std::endl;
-        std::cout << (int)(cmd.sf) << std::endl;
-        std::cout << (int)(cmd.protocol) << std::endl;
+        // std::cout << (int)(cmd.type) << std::endl;
+        // std::cout << cmd.id << std::endl;
+        // std::cout << cmd.topic << std::endl;
+        // std::cout << (int)(cmd.sf) << std::endl;
+        // std::cout << (int)(cmd.protocol) << std::endl;
+
+        if (cmd.type == CMD_CONNECT) {
+            if (clientsDB.connect(cmd.id, sock_fd) == -1) {
+                std::cout << "Client " << cmd.id << " already connected." << std::endl;
+                CMD_exit(sock_fd);
+            } else {
+                poll_add_client(sock_fd);
+                std::cout << "New client " << cmd.id << " connected from ";
+                std::cout << inet_ntoa(addr.sin_addr) << ":" << ntohs(addr.sin_port) << std::endl;
+            }
+        } else if (cmd.type == CMD_EXIT) {
+            clientData *data;
+            data = clientsDB.getClient(cmd.id);
+            if (data != NULL) {
+                poll_remove_client(poll_index);
+                clientsDB.disconnect(cmd.id);
+                std::cout << "Client " << cmd.id << " disconnected." << std::endl;
+            }
+        } else if (cmd.type == CMD_SUBSCRIBE) {
+
+        }
 
 
 
     }
+
+    void CMD_exit(int sock_fd) {
+        cmd.type = CMD_EXIT;
+        cmd_pack(buf, &cmd);
+        TCP_send(sock_fd, sizeof(command));
+    }
+
     // TODO
     void UDP_forward(uint16_t len) {
         std::string topic;

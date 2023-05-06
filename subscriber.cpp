@@ -18,6 +18,9 @@
 #define FLOAT 2
 #define STRING 3
 
+#define FLAG_DEFAULT 1
+#define FLAG_EXIT 0
+
 class Subscriber {
 private:
     // Full buffer ([2 bytes]+[buf])
@@ -40,6 +43,8 @@ private:
     std::vector<pollfd> poll_fds;
     // CMD Structure
     command cmd;
+    // Flag
+    int flag;
 
 
 public:
@@ -67,6 +72,9 @@ public:
         poll_fds[1].events = POLLIN;
         /* Command */
         cmd = {};
+        strcpy(cmd.id, this->id.c_str());
+        /* Flag */
+        flag = FLAG_DEFAULT;
     }
 
     ~Subscriber() {
@@ -79,7 +87,7 @@ public:
         CMD_connect();
 
         /* Wait for events */
-        while (true) {
+        while (flag) {
             if (poll(poll_fds.data(), poll_fds.size(), TIMEOUT) == -1) {
                 eerror("Poll failed");
             }
@@ -87,9 +95,9 @@ public:
             if (poll_fds[0].revents & POLLIN) {
                 std::cin.getline(buf, BUF_SIZE);
                 if (strcmp(buf, "exit") == 0) {
-                    send(tcp_sock, buf, 5, 0);
-                    break;
+                    CMD_exit();
                 }
+
             }
             // Check for events on the TCP Listen socket
             if (poll_fds[1].revents & POLLIN) {
@@ -181,7 +189,6 @@ private:
         }
     }
 
-    // ADD Exit Case
     void packageProcess(uint16_t len) {
         // Check the protocol of the package
         uint8_t protocol = *((uint8_t *)(buf + len - sizeof(uint8_t)));
@@ -281,15 +288,34 @@ private:
             }
 
             std::cout << std::endl;
+        } else if (protocol == CMD_PROTOCOL) {
+            cmd = cmd_unpack(buf);
+
+            if (cmd.type == CMD_EXIT)
+                flag = FLAG_EXIT;
         }
     }
 
     void CMD_connect() {
         cmd.type = CMD_CONNECT;
-        strcpy(cmd.id, id.c_str());
         cmd_pack(buf, &cmd);
         TCP_send(tcp_sock, (uint16_t)sizeof(command));
     }
+
+    void CMD_exit() {
+        cmd.type = CMD_EXIT;
+        cmd_pack(buf, &cmd);
+        TCP_send(tcp_sock, sizeof(command));
+        flag = FLAG_EXIT;
+    }
+
+    void CMD_subscribe(std::string topics, uint8_t sf) {
+        cmd.type = CMD_EXIT;
+        
+        cmd_pack(buf, &cmd);
+        TCP_send(tcp_sock, sizeof(command));
+    }
+
 };
 
 int main(int argc, char *argv[]) {

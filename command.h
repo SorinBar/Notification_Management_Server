@@ -18,10 +18,13 @@
     } __attribute__ ((__packed__)) command;
 
     /*
-        Copy cmd_package struct to the buffer
+        Copy command struct to the buffer
         Returns the length of the package
     */
     uint16_t cmd_pack(char *buf, command *cmd);
+    /*
+        Unpack data from buf to command structure and returns it
+    */
     command cmd_unpack(char *buf);
 
 #endif

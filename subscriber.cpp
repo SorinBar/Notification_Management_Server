@@ -20,6 +20,7 @@
 
 #define FLAG_DEFAULT 1
 #define FLAG_EXIT 0
+#define BAD_INPUT -1
 
 class Subscriber {
 private:
@@ -45,7 +46,6 @@ private:
     command cmd;
     // Flag
     int flag;
-
 
 public:
     Subscriber(char *id, char *ip, char *port) {
@@ -83,6 +83,10 @@ public:
     }
 
     void start() {
+        int8_t type;
+        std::string topic;
+        uint8_t sf;
+
         /* Send connect message to server */
         CMD_connect();
 
@@ -93,11 +97,24 @@ public:
             }
             // Check for events on STDIN
             if (poll_fds[0].revents & POLLIN) {
-                std::cin.getline(buf, BUF_SIZE);
-                if (strcmp(buf, "exit") == 0) {
+                type = userInput(&topic, &sf);
+                if (type == CMD_EXIT) {
                     CMD_exit();
                 }
+                
+                if (type == CMD_SUBSCRIBE) {
+                    CMD_subscribe(&topic, sf);
+                }
+                
+                if (type == CMD_UNSUBSCRIBE) {
+                    CMD_unsubscribe(&topic);
+                }
 
+                if (type == BAD_INPUT) {
+                    std::cout << "subscribe <TOPIC> <SF>" << std::endl;
+                    std::cout << "unsubscribe <TOPIC>" << std::endl;
+                    std::cout << "exit" << std::endl;
+                }
             }
             // Check for events on the TCP Listen socket
             if (poll_fds[1].revents & POLLIN) {
@@ -296,6 +313,72 @@ private:
         }
     }
 
+    int8_t userInput(std::string *topic, uint8_t *sf) {
+        char *token;
+        // Exit
+        std::cin.getline(buf, BUF_SIZE);
+        if (strcmp(buf, "exit") == 0) {
+            return CMD_EXIT;
+        }
+        token = strtok(buf, "  ");
+        // Subscribe
+        if (strcmp(token, "subscribe") == 0) {
+            // Topic
+            token = strtok(NULL, " ");
+            if (token == NULL)
+                return BAD_INPUT;
+            if (strlen(token) > 10)
+                return BAD_INPUT;
+            *topic = token;
+            // SF
+            token = strtok(NULL, " ");
+            if (token == NULL)
+                return BAD_INPUT;
+            if (strlen(token) != 1)
+                return BAD_INPUT;
+            if (*token != '0' && *token != '1')
+                return BAD_INPUT;
+            *sf = *token - '0';
+            // Number of arguments
+            token = strtok(NULL, " ");
+            if (token == NULL) {
+                return CMD_SUBSCRIBE;
+            }
+            else {
+                while (token != NULL) {
+                    token = strtok(NULL, " ");
+                }
+                return BAD_INPUT;
+            }
+        }
+        // Unsubscribe
+        if (strcmp(token, "unsubscribe") == 0) {
+            // Topic
+            token = strtok(NULL, " ");
+            if (token == NULL)
+                return BAD_INPUT;
+            if (strlen(token) > 10)
+                return BAD_INPUT;
+            *topic = token;
+            // Number of arguments
+            token = strtok(NULL, " ");
+            if (token == NULL) {
+                return CMD_UNSUBSCRIBE;
+            }
+            else {
+                while (token != NULL) {
+                    token = strtok(NULL, " ");
+                }
+                return BAD_INPUT;
+            }
+        }
+        // Bad input
+        while (token != NULL) {
+            token = strtok(NULL, " ");
+        }
+        return BAD_INPUT;
+    }
+
     void CMD_connect() {
         cmd.type = CMD_CONNECT;
         cmd_pack(buf, &cmd);
@@ -309,9 +392,17 @@ private:
         flag = FLAG_EXIT;
     }
 
-    void CMD_subscribe(std::string topics, uint8_t sf) {
-        cmd.type = CMD_EXIT;
-        
+    void CMD_subscribe(std::string *topic, uint8_t sf) {
+        cmd.type = CMD_SUBSCRIBE;
+        strcpy(cmd.topic, (*topic).c_str());
+        cmd.sf = sf;
+        cmd_pack(buf, &cmd);
+        TCP_send(tcp_sock, sizeof(command));
+    }
+
+    void CMD_unsubscribe(std::string *topic) {
+        cmd.type = CMD_UNSUBSCRIBE;
+        strcpy(cmd.topic, (*topic).c_str());
         cmd_pack(buf, &cmd);
         TCP_send(tcp_sock, sizeof(command));
     }

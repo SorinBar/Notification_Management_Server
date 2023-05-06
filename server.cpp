@@ -148,7 +148,7 @@ private:
             eerror("TCP socket bind failed");
         }
         // TODO - Might change 1 to a higher number
-        if (listen(sock, 1) < 0) {
+        if (listen(sock, 4) < 0) {
             eerror("TCP socket listen failed");
         }
         return sock;
@@ -253,16 +253,8 @@ private:
         }
     }
 
-    // TODO
     void packageProcess(int sock_fd, int poll_index) {
         command cmd = cmd_unpack(buf);
-
-        // Debug
-        // std::cout << (int)(cmd.type) << std::endl;
-        // std::cout << cmd.id << std::endl;
-        // std::cout << cmd.topic << std::endl;
-        // std::cout << (int)(cmd.sf) << std::endl;
-        // std::cout << (int)(cmd.protocol) << std::endl;
 
         if (cmd.type == CMD_CONNECT) {
             if (clientsDB.connect(cmd.id, sock_fd) == -1) {
@@ -273,7 +265,8 @@ private:
                 std::cout << "New client " << cmd.id << " connected from ";
                 std::cout << inet_ntoa(addr.sin_addr) << ":" << ntohs(addr.sin_port) << std::endl;
             }
-        } else if (cmd.type == CMD_EXIT) {
+        }
+        if (cmd.type == CMD_EXIT) {
             clientData *data;
             data = clientsDB.getClient(cmd.id);
             if (data != NULL) {
@@ -281,12 +274,13 @@ private:
                 clientsDB.disconnect(cmd.id);
                 std::cout << "Client " << cmd.id << " disconnected." << std::endl;
             }
-        } else if (cmd.type == CMD_SUBSCRIBE) {
-
         }
-
-
-
+        if (cmd.type == CMD_SUBSCRIBE) {
+            topicsDB.subscribe(cmd.topic, cmd.id); 
+        }
+        if (cmd.type == CMD_UNSUBSCRIBE) {
+            topicsDB.unsubscribe(cmd.topic, cmd.id);
+        }
     }
 
     void CMD_exit(int sock_fd) {
@@ -315,7 +309,7 @@ private:
         len = ff_pack(buf, len, ftr);
 
         // Sending
-        TCP_send(5, len);
+        //TCP_send(5, len);
     }
 
 };

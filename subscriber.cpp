@@ -360,7 +360,7 @@ private:
             token = strtok(NULL, " ");
             if (token == NULL)
                 return BAD_INPUT;
-            if (strlen(token) > 10)
+            if (strlen(token) > 50)
                 return BAD_INPUT;
             *topic = token;
             // Number of arguments

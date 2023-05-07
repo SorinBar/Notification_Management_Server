@@ -20,6 +20,7 @@
 
 #define FLAG_DEFAULT 1
 #define FLAG_EXIT 0
+
 #define BAD_INPUT -1
 
 class Subscriber {

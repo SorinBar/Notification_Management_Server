@@ -8,12 +8,12 @@
 
     class TopicsDB {
     private:
-        std::unordered_map<std::string ,std::unordered_set<std::string>> topics;
+        std::unordered_map<std::string ,std::unordered_map<std::string, uint8_t>> topics;
     
     public:
-        void subscribe(std::string topic, std::string id);
+        void subscribe(std::string topic, std::string id, uint8_t sf);
         void unsubscribe(std::string topic, std::string id);
-        std::unordered_set<std::string> *getTopic(std::string topic);
+        std::unordered_map<std::string, uint8_t> *getTopic(std::string topic);
     };
 
 #endif

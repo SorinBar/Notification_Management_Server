@@ -1,7 +1,7 @@
 #include "topicsDatabase.h"
 
-void TopicsDB::subscribe(std::string topic, std::string id) {
-    topics[topic].insert(id);
+void TopicsDB::subscribe(std::string topic, std::string id, uint8_t sf) {
+    topics[topic][id] = sf;
 }
 
 void TopicsDB::unsubscribe(std::string topic, std::string id) {
@@ -9,7 +9,7 @@ void TopicsDB::unsubscribe(std::string topic, std::string id) {
         topics[topic].erase(id);
 }
 
-std::unordered_set<std::string> *TopicsDB::getTopic(std::string topic) {
+std::unordered_map<std::string, uint8_t> *TopicsDB::getTopic(std::string topic) {
     if (topics.count(topic))
         return &(topics[topic]);
     

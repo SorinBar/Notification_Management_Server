@@ -7,7 +7,6 @@
 
     typedef struct {
         int fd;
-        uint8_t sf;
         std::queue<char *> messQueue;
     } clientData;
 

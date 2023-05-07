@@ -13,9 +13,6 @@
 #include "clientsDatabase.h"
 #include "topicsDatabase.h"
 
-#define FLAG_SUCCESS 0
-#define FLAG_FAIL 1
-
 class Server {
 private:
     // Listening port
@@ -34,8 +31,6 @@ private:
     int tcp_sock;
     // Poll
     std::vector<pollfd> poll_fds;
-    // Flag
-    int flag;
     // CMD Structure
     command cmd;
     // Clients Database
@@ -67,8 +62,6 @@ public:
         poll_fds[1].events = POLLIN;
         poll_fds[2].fd = tcp_sock;
         poll_fds[2].events = POLLIN;
-        /* Flag */
-        flag = FLAG_SUCCESS;
         /* Command */
         cmd = {};
     }
@@ -190,18 +183,17 @@ private:
         return (uint16_t)n;
     }
 
-    void TCP_send(int sock_fd, uint16_t len) {
+    void TCP_send(int sock_fd, char *buf, uint16_t len) {
         ssize_t n;
-        char *fbuf = fullbuf;
 
         len +=  sizeof(uint16_t);
-        *((uint16_t *)fbuf) = htons(len);
+        *((uint16_t *)buf) = htons(len);
         while(len != 0) {
-            n = send(sock_fd, fbuf, (size_t)len, 0);
+            n = send(sock_fd, buf, (size_t)len, 0);
             if (n < 0) {
                 eerror("TCP send error");
             }
-            fbuf += n;
+            buf += n;
             len -= (uint16_t)n;
         }
     }
@@ -262,6 +254,7 @@ private:
                 CMD_exit(sock_fd);
             } else {
                 poll_add_client(sock_fd);
+                sendStoredMessages(cmd.id);
                 std::cout << "New client " << cmd.id << " connected from ";
                 std::cout << inet_ntoa(addr.sin_addr) << ":" << ntohs(addr.sin_port) << ".\n";
             }
@@ -276,7 +269,7 @@ private:
             }
         }
         if (cmd.type == CMD_SUBSCRIBE) {
-            topicsDB.subscribe(cmd.topic, cmd.id); 
+            topicsDB.subscribe(cmd.topic, cmd.id, cmd.sf);
         }
         if (cmd.type == CMD_UNSUBSCRIBE) {
             topicsDB.unsubscribe(cmd.topic, cmd.id);
@@ -286,16 +279,18 @@ private:
     void CMD_exit(int sock_fd) {
         cmd.type = CMD_EXIT;
         cmd_pack(buf, &cmd);
-        TCP_send(sock_fd, sizeof(command));
+        TCP_send(sock_fd, fullbuf, sizeof(command));
     }
 
     // TODO
     void UDP_forward(uint16_t len) {
         char c;
+        char *buf_copy;
+        uint16_t buf_len;
         ff_ftr ftr;
         clientData *data;
         std::string topic;
-        std::unordered_set<std::string> *subscribers;
+        std::unordered_map<std::string, uint8_t> *subscribers;
 
         // Extract the topic
         c = *(buf + 50);
@@ -312,15 +307,41 @@ private:
 
         subscribers = topicsDB.getTopic(topic);
         if (subscribers != NULL) {
-            for (auto &id : *subscribers) {
-                data = clientsDB.getClient(id);
+            for (auto &pair : *subscribers) {
+                data = clientsDB.getClient(pair.first);
                 if (data != NULL) {
-                    // If client is connected
+                    // Client is connected
                     if (data->fd != -1) {
-                        TCP_send(data->fd, len);
+                        TCP_send(data->fd, fullbuf, len);
+                    } else {
+                        // Client is not connected and SF is enabled
+                        if (pair.second == 1) {
+                            buf_len = len + sizeof(uint16_t);
+                            buf_copy = new char[buf_len];
+                            std::memcpy(buf_copy, fullbuf, buf_len);
+                            *((uint16_t *)buf_copy) = buf_len;
+                            data->messQueue.push(buf_copy);
+                        }
                     }
                 }
             }
+        }
+    }
+
+    void sendStoredMessages(std::string id) {
+        clientData *data = clientsDB.getClient(id);
+        uint16_t len;
+        char *buf_cpy;
+        if (data == NULL)
+            return;
+        
+        while (!data->messQueue.empty()) {
+            buf_cpy = data->messQueue.front();
+            len = *((uint16_t *)buf_cpy) - sizeof(uint16_t);
+            TCP_send(data->fd, buf_cpy, len);
+            
+            delete []buf_cpy;
+            data->messQueue.pop();
         }
     }
 

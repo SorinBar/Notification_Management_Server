@@ -1,8 +1,13 @@
 #include "clientsDatabase.h"
 
 ClientsDB::~ClientsDB() {
-    for (auto pair:clients)
+    for (auto &pair:clients) {
+        while (!pair.second->messQueue.empty()) {
+            delete [](pair.second->messQueue.front());
+            pair.second->messQueue.pop();
+        }
         delete pair.second;
+    }
 }
 
 int ClientsDB::connect(std::string id, int fd) {
@@ -19,7 +24,6 @@ int ClientsDB::connect(std::string id, int fd) {
     } else {
         clientData *data = new clientData;
         data->fd = fd;
-        data->sf = 0;
 
         clients.insert({id, data});
     }

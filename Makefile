@@ -5,7 +5,7 @@ TARGET_1 = server
 TARGET_2 = subscriber
 
 SRCS_1 = server.cpp utils.cpp fast_forward.cpp command.cpp clientsDatabase.cpp topicsDatabase.cpp
-SRCS_2 = subscriber.cpp utils.cpp fast_forward.cpp command.cpp clientsDatabase.cpp topicsDatabase.cpp
+SRCS_2 = subscriber.cpp utils.cpp fast_forward.cpp command.cpp
 
 $(TARGET_1): $(SRCS_1)
 	$(CXX) $(CXXFLAGS) $(SRCS_1) -o $(TARGET_1)

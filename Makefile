@@ -13,11 +13,6 @@ $(TARGET_1): $(SRCS_1)
 $(TARGET_2): $(SRCS_2)
 	$(CXX) $(CXXFLAGS) $(SRCS_2) -o $(TARGET_2)
 
-.PHONY: clean runServer runSubscriber
+.PHONY: clean
 clean:
 	rm -f $(TARGET_1) $(TARGET_2)
-
-runServer: server 
-	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./server 9090
-runSubscriber: subscriber
-	valgrind --leak-check=full --track-origins=yes ./subscriber myId 127.0.0.1 9090

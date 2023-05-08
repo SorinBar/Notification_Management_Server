@@ -6,8 +6,8 @@
     #include <unistd.h>
     #include <cstring>
 
-    #define FULLBUF_SIZE 4000
-    #define BUF_SIZE 3998
+    #define FULLBUF_SIZE 8000
+    #define BUF_SIZE 7998
     #define TIMEOUT -1
 
     // Print message to STDERR and exit

@@ -140,8 +140,7 @@ private:
         if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
             eerror("TCP socket bind failed");
         }
-        // TODO - Might change 1 to a higher number
-        if (listen(sock, 4) < 0) {
+        if (listen(sock, 5) < 0) {
             eerror("TCP socket listen failed");
         }
         return sock;
@@ -282,7 +281,6 @@ private:
         TCP_send(sock_fd, fullbuf, sizeof(command));
     }
 
-    // TODO
     void UDP_forward(uint16_t len) {
         char c;
         char *buf_copy;

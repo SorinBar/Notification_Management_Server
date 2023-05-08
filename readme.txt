@@ -1,6 +1,19 @@
 # Client-Server Notification Management Platform
 ## PCom 2nd Homework
 
+Usage:
+    Start:
+    ./server <PORT_SERVER>
+    ./subscriber <ID_CLIENT> <IP_SERVER> <PORT_SERVER>
+    
+    Subscriber:
+        subscribe <TOPIC> <SF>
+        unsubscribe <TOPIC>
+        exit
+    Server:
+        exit
+        
+
 Reasoning behind the custom protocols:
 	-The main concern is the TCP fragmentation and merging of the packets,
      so we need a solution to keep track of them.
